@@ -27,15 +27,10 @@ class JustTheTooltip extends StatefulWidget implements JustTheInterface {
     this.onDismiss,
     this.onShow,
     this.controller,
-    // TODO: With the new [triggerMode] field isModal's only function is to keep
-    // the tooltip open. But in that case, it seems like we can create a new
-    // more narrow field in favor.
     this.isModal = false,
     this.waitDuration,
     this.showDuration,
-    this.triggerMode,
     this.barrierDismissible = true,
-    this.enableFeedback,
     this.hoverShowDuration,
     this.fadeInDuration = const Duration(milliseconds: 150),
     this.fadeOutDuration = const Duration(milliseconds: 75),
@@ -84,12 +79,6 @@ class JustTheTooltip extends StatefulWidget implements JustTheInterface {
 
   @override
   final bool barrierDismissible;
-
-  @override
-  final TooltipTriggerMode? triggerMode;
-
-  @override
-  final bool? enableFeedback;
 
   // FIXME: This happens in the non-hover (i.e. isModal) case as well.
   @override
@@ -294,9 +283,6 @@ abstract class _JustTheTooltipState<T> extends State<JustTheInterface>
   static const Duration _defaultShowDuration = Duration(milliseconds: 1500);
   static const Duration _defaultHoverShowDuration = Duration(milliseconds: 100);
   static const Duration _defaultWaitDuration = Duration.zero;
-  static const TooltipTriggerMode _defaultTriggerMode =
-      TooltipTriggerMode.longPress;
-  static const bool _defaultEnableFeedback = true;
 
   late final AnimationController _animationController;
   Timer? _hideTimer;
@@ -306,8 +292,6 @@ abstract class _JustTheTooltipState<T> extends State<JustTheInterface>
   late Duration waitDuration;
   late bool _mouseIsConnected = false;
   bool _pressActivated = false;
-  late TooltipTriggerMode triggerMode;
-  late bool enableFeedback;
   late bool barrierDismissible;
 
   // These properties are specific to just_the_tooltip
@@ -565,12 +549,8 @@ abstract class _JustTheTooltipState<T> extends State<JustTheInterface>
     _pressActivated = true;
     final tooltipCreated = await ensureTooltipVisible();
 
-    if (tooltipCreated && enableFeedback) {
-      if (triggerMode == TooltipTriggerMode.longPress) {
-        Feedback.forLongPress(context);
-      } else {
-        Feedback.forTap(context);
-      }
+    if (tooltipCreated) {
+      Feedback.forTap(context);
     }
   }
 
@@ -587,41 +567,24 @@ abstract class _JustTheTooltipState<T> extends State<JustTheInterface>
     hoverShowDuration = widget.showDuration ??
         tooltipTheme.showDuration ??
         _defaultHoverShowDuration;
-    triggerMode =
-        widget.triggerMode ?? tooltipTheme.triggerMode ?? _defaultTriggerMode;
-    enableFeedback = widget.enableFeedback ??
-        tooltipTheme.enableFeedback ??
-        _defaultEnableFeedback;
     barrierDismissible = widget.barrierDismissible;
 
     Widget result;
 
-    if (triggerMode == TooltipTriggerMode.manual) {
-      result = widget.child;
-    } else {
-      result = GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onLongPress: widget.isModal
-            ? null
-            : (triggerMode == TooltipTriggerMode.longPress)
-                ? _handlePress
-                : null,
-        onTap: widget.isModal
-            ? _showTooltip
-            : (triggerMode == TooltipTriggerMode.tap)
-                ? _handlePress
-                : null,
-        excludeFromSemantics: true,
-        child: widget.child,
-      );
+    result = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: widget.isModal ? null : _handlePress,
+      onTap: widget.isModal ? _showTooltip : _handlePress,
+      excludeFromSemantics: true,
+      child: widget.child,
+    );
 
-      if (_mouseIsConnected) {
-        result = MouseRegion(
-          onEnter: (PointerEnterEvent event) => _showTooltip(),
-          onExit: (PointerExitEvent event) => _hideTooltip(),
-          child: result,
-        );
-      }
+    if (_mouseIsConnected) {
+      result = MouseRegion(
+        onEnter: (PointerEnterEvent event) => _showTooltip(),
+        onExit: (PointerExitEvent event) => _hideTooltip(),
+        child: result,
+      );
     }
 
     return CompositedTransformTarget(
